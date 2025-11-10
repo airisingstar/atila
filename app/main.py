@@ -55,24 +55,60 @@ def normalize_tags(raw: str | None) -> str:
 
 
 def render_dashboard(projects: list[Project], active_project: Optional[Project], tickets: list[Ticket]) -> str:
-    """Simple inline HTML render (placeholder until templates are added)."""
-    if not projects:
-        return "<h2>No projects yet — create one using the Add + tab.</h2>"
-    out = "<h1>🚀 ATILA Dashboard</h1>"
-    out += "<form action='/create_project' method='post'><h3>Create Project</h3>"
-    out += "<input name='name' placeholder='Project Name' required><br>"
-    out += "<input name='description' placeholder='Description'><br>"
-    out += "<input name='tags' placeholder='Tags'><br>"
-    out += "<button type='submit'>Create Project</button></form>"
+    """Basic but usable HTML dashboard for ATILA."""
+    html = """
+    <html>
+      <head>
+        <title>ATILA Dashboard</title>
+        <style>
+          body { font-family: Arial, sans-serif; background: #f7f9fb; margin: 40px; }
+          h1 { color: #2563eb; }
+          form { margin-bottom: 30px; background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.05); }
+          input, textarea, select { width: 100%; padding: 8px; margin: 5px 0 10px 0; border: 1px solid #ccc; border-radius: 6px; }
+          button { background: #2563eb; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; }
+          button:hover { background: #1d4ed8; }
+          .card { background: #fff; padding: 15px; margin: 10px 0; border-radius: 8px; box-shadow: 0 0 6px rgba(0,0,0,0.05); }
+        </style>
+      </head>
+      <body>
+        <h1>🚀 ATILA — Adaptive Ticket Intelligence Layer</h1>
+        
+        <form action="/create_project" method="post">
+          <h2>Create Project</h2>
+          <input type="text" name="name" placeholder="Project Name" required>
+          <input type="text" name="description" placeholder="Description">
+          <input type="text" name="tags" placeholder="Tags (comma separated)">
+          <button type="submit">Create Project</button>
+        </form>
+    """
 
-    out += f"<h2>Active Project: {active_project.name if active_project else 'None'}</h2>"
+    if not projects:
+        html += "<h3>No projects yet. Add your first project above!</h3></body></html>"
+        return html
+
+    html += "<h2>Existing Projects</h2>"
+    for p in projects:
+        html += f"<div class='card'><b>{p.name}</b> — {p.status}<br>{p.description or ''}</div>"
+
     if active_project:
-        out += f"<h3>Tickets for {active_project.name}</h3>"
-        out += "<ul>"
+        html += f"<h2>Active Project: {active_project.name}</h2>"
+        html += f"<form action='/add_ticket' method='post'>"
+        html += f"<input type='hidden' name='project_id' value='{active_project.id}'>"
+        html += f"<h3>Add Ticket to {active_project.name}</h3>"
+        html += "<input name='title' placeholder='Ticket title' required>"
+        html += "<textarea name='description' placeholder='Description'></textarea>"
+        html += "<select name='priority'><option>Highest</option><option>High</option><option>Medium</option><option>Low</option><option>Backlog</option></select>"
+        html += "<select name='status'><option>Backlog</option><option>Active</option><option>Completed</option></select>"
+        html += "<select name='category'><option>Product Management</option><option>Product Quality</option><option>Product Scaling</option><option>Other</option></select>"
+        html += "<button type='submit'>Add Ticket</button></form>"
+
+        html += "<h3>Tickets</h3>"
         for t in tickets:
-            out += f"<li>[{t.priority}] {t.title} — {t.status}</li>"
-        out += "</ul>"
-    return out
+            html += f"<div class='card'>[{t.priority}] {t.title} — {t.status}</div>"
+
+    html += "</body></html>"
+    return html
+
 
 
 # ---------------------------
