@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends
 from sqlmodel import SQLModel, select
 from sqlmodel import Session
 from ..db import get_session
-from ..models import Project
+from ..services.models import Project
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 

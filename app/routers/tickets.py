@@ -4,8 +4,8 @@ from sqlmodel import select
 from sqlmodel import Session
 from typing import Optional
 from ..db import get_session
-from ..models import Ticket, Project
-from ..scoring import recalc_scores
+from ..services.models import Ticket, Project
+from ..services.scoring import recalc_scores
 
 router = APIRouter(prefix="/api/tickets", tags=["tickets"])
 

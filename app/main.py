@@ -6,8 +6,8 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from sqlalchemy import create_engine, select
-from .models import Base, Project, Ticket
-from .scoring import recalc_scores, assign_all_scores_for_project
+from .services.models import Base, Project, Ticket
+from .services.scoring import recalc_scores, assign_all_scores_for_project
 
 app = FastAPI(title="ATILA — Adaptive Ticket Intelligence Layer")
 
@@ -202,3 +202,21 @@ def set_project_active(project_id: int = Form(...)):
         assign_all_scores_for_project(session, project_id)
 
     return RedirectResponse(url="/", status_code=303)
+
+# ==========================================================
+# Routers
+# ==========================================================
+from fastapi.middleware.cors import CORSMiddleware
+from app.routers import normalize
+
+# Enable CORS (optional but helpful for local testing)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Mount routers
+app.include_router(normalize.router)
+
