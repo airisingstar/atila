@@ -1,42 +1,132 @@
-{% extends "base.html" %}
-{% block content %}
-<section class="projects">
-  <h2>Projects</h2>
-  <form method="post" action="/create_project">
-    <input type="text" name="name" placeholder="Project name" required>
-    <input type="text" name="description" placeholder="Description">
-    <button type="submit">+ Add Project</button>
-  </form>
-  <ul>
-    {% for p in projects %}
-      <li><a href="/project/{{p.id}}">{{p.name}}</a> ({{p.priority}})</li>
-    {% endfor %}
-  </ul>
-</section>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>ATILA — Adaptive Ticket Intelligence Layer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <style>
+    :root { --ink:#0f172a; --bg:#0b1220; --card:#111827; --muted:#94a3b8; --accent:#3B82F6; --radius:12px; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: Inter, system-ui, sans-serif; color:#111827; background:#f6f7fb; }
+    header { background:#0f1a36; color:#fff; padding:22px 28px; font-weight:800; font-size:26px; letter-spacing:.3px; }
+    .wrap { display:grid; grid-template-columns: 280px 1fr; gap:18px; padding:18px; max-width:1300px; margin:0 auto; }
+    .panel { background:#fff; border-radius:var(--radius); padding:16px; box-shadow:0 1px 2px rgba(0,0,0,.05); }
+    .side h3 { margin:6px 0 12px; font-size:14px; color:#334155; }
+    .proj-item { padding:10px 12px; border-radius:10px; cursor:pointer; display:flex; justify-content:space-between; }
+    .proj-item:hover { background:#f1f5f9; }
+    .pill { font-size:11px; color:#475569; background:#e2e8f0; border-radius:999px; padding:2px 8px; }
+    .tabs { display:flex; gap:10px; border-bottom:1px solid #e5e7eb; margin-bottom:14px; }
+    .tab { padding:8px 12px; border-radius:8px 8px 0 0; cursor:pointer; }
+    .tab.active { background:#fff; color:#111827; border:1px solid #e5e7eb; border-bottom:none; }
+    .muted { color:#64748b; font-size:12px; }
+    input, select, textarea { width:100%; padding:8px 10px; border:1px solid #e5e7eb; border-radius:8px; outline:none; }
+    button { padding:9px 14px; border:none; background:var(--accent); color:white; border-radius:8px; cursor:pointer; font-weight:600; }
+    table { width:100%; border-collapse:collapse; }
+    th, td { padding:10px 12px; border-bottom:1px solid #f1f5f9; text-align:left; }
+    th { background:#f8fafc; color:#334155; font-size:12px; text-transform:uppercase; letter-spacing:.04em; }
+    .row { display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px; }
+    .hide { display:none; }
+    .tag-hint { font-size:12px; color:#475569; margin-top:6px; }
+    .readonly-tag { font-weight:800; color:#111827 }
+  </style>
+</head>
+<body>
+  <header>⚙️ ATILA — Adaptive Ticket Intelligence Layer</header>
 
-{% if project %}
-<section class="tickets">
-  <h2>Tickets for {{project.name}}</h2>
-  <form method="post" action="/add_ticket/{{project.id}}">
-    <input type="text" name="title" placeholder="Ticket title" required>
-    <input type="text" name="description" placeholder="Description">
-    <select name="priority">
-      <option>Highest</option><option>High</option><option>Medium</option><option>Low</option>
-    </select>
-    <button type="submit">+ Add Ticket</button>
-  </form>
-  <table>
-    <tr><th>ID</th><th>Title</th><th>Priority</th><th>Status</th><th>Score</th></tr>
-    {% for t in tickets %}
-      <tr>
-        <td>{{t.id}}</td>
-        <td>{{t.title}}</td>
-        <td>{{t.priority}}</td>
-        <td>{{t.status}}</td>
-        <td>{{"%.2f"|format(t.pscore)}}</td>
-      </tr>
-    {% endfor %}
-  </table>
-</section>
-{% endif %}
-{% endblock %}
+  <div class="wrap">
+    <!-- Left Sidebar -->
+    <aside class="panel side">
+      <h3>Projects</h3>
+      <div id="project-list">
+        <!-- injected -->
+      </div>
+      <hr style="margin:12px 0;">
+      <form method="post" action="/set_project_active">
+        <div class="row">
+          <input type="number" name="project_id" placeholder="Project ID to activate"/>
+          <button type="submit">Activate</button>
+        </div>
+        <div class="muted" style="margin-top:6px;">Projects must be <b>Active</b> to enter ATILA workflow.</div>
+      </form>
+    </aside>
+
+    <!-- Main -->
+    <main class="panel">
+      <div class="tabs">
+        <div class="tab active" id="tab-active">Active</div>
+        <div class="tab" id="tab-add">ADD +</div>
+      </div>
+
+      <!-- Active Tab -->
+      <section id="pane-active">
+        <div id="active-content"><!-- injected --></div>
+      </section>
+
+      <!-- Add Tab -->
+      <section id="pane-add" class="hide">
+        <h3>Create New Project</h3>
+        <form method="post" action="/create_project">
+          <div class="row" style="margin-bottom:8px;">
+            <input name="name" placeholder="Project name" required />
+            <input name="description" placeholder="Description"/>
+            <input name="tags" placeholder='Tags (comma separated)' />
+          </div>
+          <div class="tag-hint">
+            Default required tags will be auto-added:&nbsp;
+            <span class="readonly-tag">Score:[0.00]</span>, <span class="readonly-tag">Ticket_ID:0</span>
+          </div>
+          <div style="margin-top:10px;">
+            <button type="submit">+ Add Project</button>
+          </div>
+        </form>
+
+        <hr style="margin:18px 0;">
+
+        <h3>Add Ticket (to first project)</h3>
+        <form method="post" action="/add_ticket">
+          <div class="row" style="margin-bottom:8px;">
+            <input name="project_id" placeholder="Project ID" required />
+            <input name="title" placeholder="Ticket title" required />
+            <input name="description" placeholder="Description"/>
+          </div>
+          <div class="row">
+            <select name="priority">
+              <option>Highest</option><option>High</option><option selected>Medium</option><option>Low</option>
+              <option>Backlog</option><option>Completed</option>
+            </select>
+            <select name="status">
+              <option>Active</option><option selected>Backlog</option><option>Completed</option>
+            </select>
+            <select name="category">
+              <option>Product Management</option><option>Product Quality</option>
+              <option>Product Scaling</option><option>Other</option>
+            </select>
+          </div>
+          <div style="margin-top:10px;">
+            <button type="submit">+ Add Ticket</button>
+          </div>
+        </form>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    // Simple tab logic
+    const tabActive = document.getElementById("tab-active");
+    const tabAdd = document.getElementById("tab-add");
+    const paneActive = document.getElementById("pane-active");
+    const paneAdd = document.getElementById("pane-add");
+
+    tabActive.onclick = () => {
+      tabActive.classList.add("active"); tabAdd.classList.remove("active");
+      paneActive.classList.remove("hide"); paneAdd.classList.add("hide");
+    };
+    tabAdd.onclick = () => {
+      tabAdd.classList.add("active"); tabActive.classList.remove("active");
+      paneAdd.classList.remove("hide"); paneActive.classList.add("hide");
+    };
+  </script>
+</body>
+</html>

@@ -1,48 +1,71 @@
-from sqlmodel import SQLModel, Field, Relationship
-from datetime import datetime
+from __future__ import annotations
+from datetime import datetime, date
 from typing import Optional, List
-from enum import Enum
+from sqlmodel import SQLModel, Field, Relationship
 
-# --------------------------------------
-# Enums
-# --------------------------------------
-class Methodology(str, Enum):
-    agile = "agile"
-    scrum = "scrum"
-    classic = "classic"
-    custom = "custom"
 
-# --------------------------------------
+# ---------------------------
+# Constants (string enums)
+# ---------------------------
+PROJECT_TYPES = ["business", "technical", "research"]
+PROJECT_STATUSES = ["Created", "Building", "Active", "Archived"]
+PRIORITIES = ["Highest", "High", "Medium", "Low", "Backlog", "Completed"]
+TICKET_STATUSES = ["Active", "Backlog", "Completed"]
+TICKET_CATEGORIES = [
+    "Product Management",
+    "Product Quality",
+    "Product Scaling",
+    "Other",
+]
+
+
+# ---------------------------
 # Models
-# --------------------------------------
+# ---------------------------
 class Project(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    name: str
+    name: str = Field(index=True)
     description: Optional[str] = None
-    type: str = "Business"
-    priority: str = "Medium"
-    status: str = "Planned"
-    methodology: Methodology = Field(default=Methodology.scrum)
-    requirement: Optional[str] = None
-    planned_start_date: datetime = Field(default_factory=lambda: datetime(2025,10,1))
-    planned_end_date: str = "Continuous"
-    sprint_length_days: int = 14
-    current_sprint_name: Optional[str] = None
+
+    # plain strings instead of Enum types
+    type: str = Field(default="business", description="Project type")
+    priority: str = Field(default="Medium", description="Priority level")
+    status: str = Field(default="Created", description="Project status")
+
+    tags: str = Field(default="Score:[0.00], Ticket_ID:0")
+
+    planned_start_date: Optional[date] = Field(default_factory=date.today)
+    planned_end_date: Optional[date] = None
+
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
     tickets: List["Ticket"] = Relationship(back_populates="project")
+
 
 class Ticket(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    project_id: Optional[int] = Field(default=None, foreign_key="project.id")
+
     title: str
     description: Optional[str] = None
-    priority: str = "Medium"
-    status: str = "Building"
-    queue: Optional[str] = None
-    etl_validated: bool = False
-    activated_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
+
+    priority: str = Field(default="Medium")
+    status: str = Field(default="Backlog")
+    category: str = Field(default="Product Management")
+
+    pscore: float = Field(default=0.0, index=True)
+    display_score: int = Field(default=0)
+    ticket_order_id: int = Field(default=0)
+
+    project_id: int = Field(foreign_key="project.id")
+    project: Optional[Project] = Relationship(back_populates="tickets")
+
+    planned_start_date: Optional[date] = None
+    planned_end_date: Optional[date] = None
+
+    assignee: Optional[str] = None
+    integration_source: Optional[str] = None
+    integration_id: Optional[str] = None
+
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
-    pscore: float = 0.0
-    display_score: int = 0
-    project: Optional[Project] = Relationship(back_populates="tickets")
