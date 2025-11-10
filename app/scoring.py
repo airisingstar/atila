@@ -2,7 +2,8 @@ from datetime import datetime, timezone
 from typing import List, Tuple
 
 from sqlmodel import select
-from .models import Ticket, Project, Priority, TicketStatus
+from .models import Ticket, Project
+
 
 
 # Base priority weights & age multipliers
