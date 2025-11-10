@@ -1,0 +1,54 @@
+# ==========================================================
+# ATILA — Golden Standard Platform Field Map
+# Version: v1.0
+# Maps Jira, ServiceNow, GitHub Issues, Azure DevOps
+# to the universal Smart Table schema
+# ==========================================================
+
+jira:
+  id: key
+  title: fields.summary
+  description: fields.description
+  status: fields.status.name
+  priority: fields.priority.name
+  assignee: fields.assignee.displayName
+  labels: fields.labels
+  created_at: fields.created
+  updated_at: fields.updated
+  project: fields.project.key
+
+servicenow:
+  id: number
+  title: short_description
+  description: description
+  status: state
+  priority: priority
+  assignee: assigned_to.display_value
+  labels: category
+  created_at: opened_at
+  updated_at: updated_on
+  project: sys_class_name
+
+github:
+  id: id
+  title: title
+  description: body
+  status: state
+  priority: null
+  assignee: assignee.login
+  labels: labels[].name
+  created_at: created_at
+  updated_at: updated_at
+  project: repository.name
+
+azure:
+  id: id
+  title: fields["System.Title"]
+  description: fields["System.Description"]
+  status: fields["System.State"]
+  priority: fields["Microsoft.VSTS.Common.Priority"]
+  assignee: fields["System.AssignedTo"]
+  labels: fields["System.Tags"]
+  created_at: fields["System.CreatedDate"]
+  updated_at: fields["System.ChangedDate"]
+  project: fields["System.TeamProject"]
