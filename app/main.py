@@ -15,9 +15,11 @@ app = FastAPI(title="ATILA — Adaptive Ticket Intelligence Layer")
 BASE_DIR = Path(__file__).resolve().parent.parent
 DB_PATH = BASE_DIR / "atila.db"
 
-engine = create_engine(f"sqlite:///{DB_PATH}", echo=False, connect_args={"check_same_thread": False})
+engine = create_engine(
+    f"sqlite:///{DB_PATH}", echo=False, connect_args={"check_same_thread": False}
+)
 
-# Ensure static dir exists
+# Ensure static + templates directories exist
 static_dir = BASE_DIR / "static"
 static_dir.mkdir(exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
@@ -53,6 +55,17 @@ def normalize_tags(raw: str | None) -> str:
     return ", ".join(existing)
 
 
+def render_dashboard(projects: list[Project], active_project: Optional[Project], tickets: list[Ticket]) -> str:
+    """Simple inline HTML render (placeholder until templates are added)."""
+    if not projects:
+        return "<h2>No projects yet — create one using the Add + tab.</h2>"
+    out = f"<h1>{active_project.name if active_project else 'No Active Project'}</h1><ul>"
+    for t in tickets:
+        out += f"<li>[{t.priority}] {t.title} — {t.status}</li>"
+    out += "</ul>"
+    return out
+
+
 # ---------------------------
 # Routes
 # ---------------------------
@@ -62,14 +75,12 @@ def home(request: Request):
         projects = session.exec(select(Project)).all()
         projects.sort(key=lambda p: p.name.lower())
 
-        # If there’s at least one project, show the first as “active” panel
         active_project: Optional[Project] = projects[0] if projects else None
         tickets: list[Ticket] = []
         if active_project:
             tickets = session.exec(
                 select(Ticket).where(Ticket.project_id == active_project.id)
             ).all()
-            # default table view shows by display_score asc
             tickets.sort(key=lambda t: t.display_score)
 
         html = render_dashboard(projects, active_project, tickets)
@@ -88,14 +99,13 @@ def create_project(
         project = Project(
             name=name,
             description=description or None,
-            status=ProjectStatus.Created,
+            status="Created",
             tags=normalize_tags(tags),
         )
         session.add(project)
         session.commit()
         session.refresh(project)
 
-        # initial scoring state (no tickets yet)
         assign_all_scores_for_project(session, project.id)
 
     return RedirectResponse(url="/", status_code=303)
@@ -118,9 +128,9 @@ def add_ticket(
         t = Ticket(
             title=title,
             description=description or None,
-            priority=Priority(priority),
-            status=TicketStatus(status),
-            category=TicketCategory(category) if category in TicketCategory.__members__.values() else TicketCategory.ProductManagement,
+            priority=priority,
+            status=status,
+            category=category,
             project_id=project_id,
         )
         session.add(t)
@@ -138,7 +148,7 @@ def set_project_active(project_id: int = Form(...)):
         project = session.get(Project, project_id)
         if not project:
             raise HTTPException(status_code=404, detail="Project not found")
-        project.status = ProjectStatus.Active
+        project.status = "Active"
         session.add(project)
         session.commit()
 
