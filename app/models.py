@@ -1,7 +1,8 @@
 from __future__ import annotations
 from datetime import datetime, date
 from typing import Optional, List
-from sqlmodel import SQLModel, Field, Relationship
+from sqlalchemy.orm import Mapped, relationship
+from sqlmodel import SQLModel, Field
 
 
 # ---------------------------
@@ -40,7 +41,8 @@ class Project(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
-    tickets: List["Ticket"] = Relationship(back_populates="project")
+    # ✅ SQLAlchemy 2.x relationship syntax
+    tickets: Mapped[List["Ticket"]] = relationship(back_populates="project")
 
 
 class Ticket(SQLModel, table=True):
@@ -58,7 +60,9 @@ class Ticket(SQLModel, table=True):
     ticket_order_id: int = Field(default=0)
 
     project_id: int = Field(foreign_key="project.id")
-    project: Optional[Project] = Relationship(back_populates="tickets")
+
+    # ✅ SQLAlchemy 2.x relationship syntax
+    project: Mapped[Optional["Project"]] = relationship(back_populates="tickets")
 
     planned_start_date: Optional[date] = None
     planned_end_date: Optional[date] = None
