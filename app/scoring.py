@@ -1,12 +1,13 @@
 from datetime import datetime, timezone
 from typing import List, Tuple
-
-from sqlmodel import select
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 from .models import Ticket, Project
 
 
-
-# Base priority weights & age multipliers
+# ---------------------------
+# Priority Weights
+# ---------------------------
 BASE_WEIGHTS = {
     "Highest": 4,
     "High": 3,
@@ -25,39 +26,45 @@ AGE_MULTIPLIER = {
 }
 
 
+# ---------------------------
+# Core Scoring
+# ---------------------------
 def compute_pscore(ticket: Ticket, now: datetime) -> float:
-    pr = ticket.priority.value if isinstance(ticket.priority, Priority) else str(ticket.priority)
-    priority = pr if pr in BASE_WEIGHTS else "Medium"
-    base = BASE_WEIGHTS[priority]
-    mult = AGE_MULTIPLIER[priority]
-    # Ensure naive arithmetic (SQLite stores naive UTC via default)
-    age_days = max(
-        0.0,
-        (now - ticket.created_at.replace(tzinfo=None)).total_seconds() / 86400.0
-        if isinstance(ticket.created_at, datetime) else 0.0
-    )
+    """Compute a weighted priority score based on age and base weight."""
+    priority = str(ticket.priority or "Medium")
+    base = BASE_WEIGHTS.get(priority, 2)
+    mult = AGE_MULTIPLIER.get(priority, 1.0)
+
+    if isinstance(ticket.created_at, datetime):
+        age_days = max(
+            0.0,
+            (now - ticket.created_at.replace(tzinfo=None)).total_seconds() / 86400.0,
+        )
+    else:
+        age_days = 0.0
+
     return round(base + mult * age_days, 4)
 
 
 def rank_and_assign_display_scores(tickets: List[Ticket]) -> Tuple[List[Ticket], List[Ticket], List[Ticket]]:
-    # Split groups
-    active = [t for t in tickets if t.status == TicketStatus.Active]
-    backlog = [t for t in tickets if t.status == TicketStatus.Backlog]
-    completed = [t for t in tickets if t.status == TicketStatus.Completed]
+    """Rank tickets and assign display and ticket_order IDs."""
+    active = [t for t in tickets if t.status == "Active"]
+    backlog = [t for t in tickets if t.status == "Backlog"]
+    completed = [t for t in tickets if t.status == "Completed"]
 
-    # Active: sort by pscore desc, then created_at asc (older first), assign 1..n
+    # Active: highest first
     active.sort(key=lambda t: (-t.pscore, t.created_at, t.id or 0))
     for i, t in enumerate(active, start=1):
         t.display_score = i
-        t.ticket_order_id = i  # Ticket_ID range for active
+        t.ticket_order_id = i
 
-    # Backlog: order by pscore desc, created_at asc, assign 10000+
+    # Backlog: lower weight but aging
     backlog.sort(key=lambda t: (-t.pscore, t.created_at, t.id or 0))
     for i, t in enumerate(backlog, start=1):
         t.display_score = 1000 + i
         t.ticket_order_id = 10000 + i
 
-    # Completed: oldest first, assign 100000+
+    # Completed: oldest first
     completed.sort(key=lambda t: (t.created_at, t.id or 0))
     for i, t in enumerate(completed, start=1):
         t.display_score = 10000 + i
@@ -66,22 +73,27 @@ def rank_and_assign_display_scores(tickets: List[Ticket]) -> Tuple[List[Ticket],
     return active, backlog, completed
 
 
-def assign_all_scores_for_project(session, project_id: int):
-    """Recalculate pscore & ticket_order_id for all tickets in a project."""
+# ---------------------------
+# Assignment per Project
+# ---------------------------
+def assign_all_scores_for_project(session: Session, project_id: int):
+    """Recalculate scores and display order for all tickets in a project."""
     now = datetime.now(timezone.utc).astimezone().replace(tzinfo=None)
 
-    tickets = session.exec(select(Ticket).where(Ticket.project_id == project_id)).all()
+    tickets = session.execute(
+        select(Ticket).where(Ticket.project_id == project_id)
+    ).scalars().all()
+
     for t in tickets:
         t.pscore = compute_pscore(t, now)
 
-    # rank + assign display & ticket IDs
     a, b, c = rank_and_assign_display_scores(tickets)
     session.add_all(a + b + c)
     session.commit()
 
 
-def recalc_scores(session):
-    """Recalculate for ALL projects (used on startup or periodic)."""
-    projects = session.exec(select(Project)).all()
+def recalc_scores(session: Session):
+    """Recalculate scores for all projects."""
+    projects = session.execute(select(Project)).scalars().all()
     for p in projects:
         assign_all_scores_for_project(session, p.id)

@@ -1,13 +1,12 @@
 from __future__ import annotations
 from pathlib import Path
 from typing import Optional
-
 from fastapi import FastAPI, Request, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from sqlmodel import SQLModel, Session, create_engine, select
-
-from .models import Project, Ticket
+from sqlalchemy.orm import Session
+from sqlalchemy import create_engine, select
+from .models import Base, Project, Ticket
 from .scoring import recalc_scores, assign_all_scores_for_project
 
 app = FastAPI(title="ATILA — Adaptive Ticket Intelligence Layer")
@@ -32,7 +31,7 @@ templates_dir.mkdir(exist_ok=True)
 # DB Init
 # ---------------------------
 def init_db():
-    SQLModel.metadata.create_all(engine)
+    Base.metadata.create_all(engine)
 
 
 @app.on_event("startup")
@@ -59,10 +58,20 @@ def render_dashboard(projects: list[Project], active_project: Optional[Project],
     """Simple inline HTML render (placeholder until templates are added)."""
     if not projects:
         return "<h2>No projects yet — create one using the Add + tab.</h2>"
-    out = f"<h1>{active_project.name if active_project else 'No Active Project'}</h1><ul>"
-    for t in tickets:
-        out += f"<li>[{t.priority}] {t.title} — {t.status}</li>"
-    out += "</ul>"
+    out = "<h1>🚀 ATILA Dashboard</h1>"
+    out += "<form action='/create_project' method='post'><h3>Create Project</h3>"
+    out += "<input name='name' placeholder='Project Name' required><br>"
+    out += "<input name='description' placeholder='Description'><br>"
+    out += "<input name='tags' placeholder='Tags'><br>"
+    out += "<button type='submit'>Create Project</button></form>"
+
+    out += f"<h2>Active Project: {active_project.name if active_project else 'None'}</h2>"
+    if active_project:
+        out += f"<h3>Tickets for {active_project.name}</h3>"
+        out += "<ul>"
+        for t in tickets:
+            out += f"<li>[{t.priority}] {t.title} — {t.status}</li>"
+        out += "</ul>"
     return out
 
 
@@ -72,16 +81,16 @@ def render_dashboard(projects: list[Project], active_project: Optional[Project],
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
     with Session(engine) as session:
-        projects = session.exec(select(Project)).all()
+        projects = session.execute(select(Project)).scalars().all()
         projects.sort(key=lambda p: p.name.lower())
 
         active_project: Optional[Project] = projects[0] if projects else None
         tickets: list[Ticket] = []
         if active_project:
-            tickets = session.exec(
+            tickets = session.execute(
                 select(Ticket).where(Ticket.project_id == active_project.id)
-            ).all()
-            tickets.sort(key=lambda t: t.display_score)
+            ).scalars().all()
+            tickets.sort(key=lambda t: t.display_score or 0)
 
         html = render_dashboard(projects, active_project, tickets)
         return HTMLResponse(html)
@@ -94,8 +103,10 @@ def create_project(
     tags: str = Form(""),
 ):
     with Session(engine) as session:
-        if session.exec(select(Project).where(Project.name == name)).first():
+        existing = session.execute(select(Project).where(Project.name == name)).scalar_one_or_none()
+        if existing:
             raise HTTPException(status_code=400, detail="Project name already exists.")
+
         project = Project(
             name=name,
             description=description or None,
